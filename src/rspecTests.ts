@@ -87,17 +87,27 @@ export class RspecTests extends Tests {
    */
   runSingleTest = async (testLocation: string) => new Promise<string>(async (resolve, reject) => {
     this.log.info(`Running single test: ${testLocation}`);
-    const spawnArgs: childProcess.SpawnOptions = {
-      cwd: this.workspace.uri.fsPath,
-      shell: true
+
+    // If ”test command” contains spaces assume that the first part is the actual executable,
+    // and the remaining parts are arguments. This works for cases like `bundle exec rspec``
+    // but would fail for more complex command lines like `SOME_ENV_VAR=1 run some_tests`.
+    const [testCommandExecutable, ...testCommandArgs] = this.getTestCommand().split(' ');
+    const args = [
+      ...testCommandArgs,
+      "--require", this.getCustomFormatterLocation(),
+      "--format", "CustomFormatter",
+      testLocation
+    ];
+    const spawnOptions: childProcess.SpawnOptions = {
+      cwd: this.workspace.uri.fsPath
     };
 
-    let testCommand = `${this.getTestCommand()} --require ${this.getCustomFormatterLocation()} --format CustomFormatter ${testLocation}`;
-    this.log.info(`Running command: ${testCommand}`);
+    this.log.info(`Running command: "${testCommandExecutable}" with arguments: "${args.join(' ')}"`);
 
     let testProcess = childProcess.spawn(
-      testCommand,
-      spawnArgs
+      testCommandExecutable,
+      args,
+      spawnOptions
     );
 
     resolve(await this.handleChildProcess(testProcess));
